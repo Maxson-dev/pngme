@@ -1,4 +1,4 @@
-package chunk
+package typecode
 
 import (
 	"bytes"
@@ -156,4 +156,3 @@ func TestChunkTypeString(t *testing.T) {
 		t.Fatalf("chunk.String('%s') != %s", str, str)
 	}
 }
-

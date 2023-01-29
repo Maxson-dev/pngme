@@ -64,7 +64,7 @@ func TestS2B(t *testing.T) {
 		out = append(out, in...)
 		tests = append(tests, TestCase{In: in, Out: out})
 	}
-	
+
 	for _, test := range tests {
 		res := S2B(test.In)
 		t.Logf("S2B(%s) == %v\n", test.In, test.Out)
