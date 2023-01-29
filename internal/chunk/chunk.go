@@ -17,9 +17,9 @@ var (
 )
 
 type Chunk struct {
+	crc  uint32
 	tp   typecode.ChunkType
 	data []byte
-	crc  uint32
 }
 
 func New(chTp []byte, data []byte) (*Chunk, error) {
@@ -48,7 +48,11 @@ func New(chTp []byte, data []byte) (*Chunk, error) {
 
 	crc := crc32.Checksum(bytesMBS.Bytes(), crcTable)
 
-	return &Chunk{*tp, data, crc}, nil
+	return &Chunk{
+		tp:   *tp,
+		data: data,
+		crc:  crc,
+	}, nil
 }
 
 func MakeIEND() *Chunk {
@@ -79,21 +83,40 @@ func (c *Chunk) Marshal() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	buf.Grow(c.Size() + 10)
 
-	if err := binary.Write(buf, binary.BigEndian, c.Size()); err != nil {
-		return nil, fmt.Errorf("marshal chunk: %v", err)
+	if err := binary.Write(buf, binary.BigEndian, uint32(c.Size())); err != nil {
+		return nil, fmt.Errorf("marshal chunk: %v\n", err)
 	}
 
 	if _, err := buf.Write(c.tp.Marshal()); err != nil {
-		return nil, fmt.Errorf("marshal chunk: %v", err)
+		return nil, fmt.Errorf("marshal chunk: %v\n", err)
 	}
 
 	if _, err := buf.Write(c.data); err != nil {
-		return nil, fmt.Errorf("marshal chunk: %v", err)
+		return nil, fmt.Errorf("marshal chunk: %v\n", err)
 	}
 
 	if err := binary.Write(buf, binary.BigEndian, c.crc); err != nil {
-		return nil, fmt.Errorf("marshal chunk: %v", err)
+		return nil, fmt.Errorf("marshal chunk: %v\n", err)
 	}
 
 	return buf.Bytes(), nil
+}
+
+func (c *Chunk) Print(i int) {
+	var data string
+	if c.Size() >= 30 {
+		data = utils.B2S(c.Data()[:30])
+	} else {
+		data = utils.B2S(c.Data())
+	}
+	fmt.Printf("---------------------------\n")
+	fmt.Printf("Chunk: # %d\n", i)
+	fmt.Printf("---------------------------\n")
+	fmt.Printf("Chunk length: # %d\n", c.Size())
+	fmt.Printf("---------------------------\n")
+	fmt.Printf("Chunk type: %s\n", c.Type().String())
+	fmt.Printf("---------------------------\n")
+	fmt.Printf("Chunk data: (%d bytes) %v\n", len(data), data)
+	fmt.Printf("---------------------------\n")
+	fmt.Printf("\n")
 }

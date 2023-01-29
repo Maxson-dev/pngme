@@ -1,10 +1,10 @@
 package png
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"os"
 	"pngme/internal/chunk"
 	"pngme/pkg/utils"
@@ -27,49 +27,48 @@ func FromChunks(chunks []chunk.Chunk) *Png {
 
 func FromFile(f *os.File) (*Png, error) {
 	png := new(Png)
-	png.chunks = make([]chunk.Chunk, 0)
-	r := bufio.NewReader(f)
-	head, err := r.Peek(8)
+
+	head := make([]byte, 8)
+	_, err := io.ReadFull(f, head)
 	if err != nil {
-		return nil, fmt.Errorf("png from file: %v", err)
+		return nil, fmt.Errorf("png from file: %v\n", err)
 	}
+
 	if !bytes.Equal(head, standartHeader[:]) {
-		return nil, fmt.Errorf("invalid png header: %v", head)
+		return nil, fmt.Errorf("invalid png header: %v\n", head)
 	}
 
 	chunks := make([]chunk.Chunk, 0)
 	for {
-		size, err := r.Peek(4)
+		buf := make([]byte, 4)
+		_, err := io.ReadFull(f, buf)
+		if err != nil {
+			return nil, err
+		}
+		ln := binary.BigEndian.Uint32(buf)
+
+		_, err = io.ReadFull(f, buf)
 		if err != nil {
 			return nil, err
 		}
 
-		ln := binary.BigEndian.Uint32(size)
-		if err != nil {
-			return nil, err
-		}
-
-		tp, err := r.Peek(4)
-		if err != nil {
-			return nil, err
-		}
-
-		if utils.B2S(tp) == chunk.IEND {
+		if utils.B2S(buf) == chunk.IEND {
 			break
 		}
 
-		data, err := r.Peek(int(ln))
+		data := make([]byte, ln)
+		_, err = io.ReadFull(f, data)
 		if err != nil {
 			return nil, err
 		}
 
-		chunk, err := chunk.New(tp, data)
+		chunk, err := chunk.New(buf, data)
 		if err != nil {
 			return nil, err
 		}
 
 		// skip crc
-		_, err = r.Discard(4)
+		io.ReadFull(f, buf)
 		if err != nil {
 			return nil, err
 		}
@@ -77,7 +76,13 @@ func FromFile(f *os.File) (*Png, error) {
 		chunks = append(chunks, *chunk)
 	}
 
+	png.chunks = chunks
+
 	return png, nil
+}
+
+func (p *Png) Chunks() []chunk.Chunk {
+	return p.chunks
 }
 
 func (p *Png) Header() []byte {
@@ -112,13 +117,14 @@ func (p *Png) Marshal() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (p *Png) ChunkByType(chnkT string) *chunk.Chunk {
+func (p *Png) ChunksByType(chnkT string) []chunk.Chunk {
+	res := make([]chunk.Chunk, 0)
 	for _, chunk := range p.chunks {
 		if chunk.Type().String() == chnkT {
-			return &chunk
+			res = append(res, chunk)
 		}
 	}
-	return nil
+	return res
 }
 
 func (p *Png) AppendChunk(chnk *chunk.Chunk) {

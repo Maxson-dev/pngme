@@ -1,24 +1,68 @@
 package main
 
 import (
-	"bytes"
-	"encoding/binary"
+	"flag"
 	"fmt"
-	"hash/crc32"
+	"os"
+	"pngme/internal/api"
+)
+
+const (
+	encode = "encode"
+	decode = "decode"
+	print  = "print"
+	remove = "remove"
 )
 
 func main() {
-	str := "hello"
-	bb := new(bytes.Buffer)
-	binary.Write(bb, binary.BigEndian, []byte(str))
+	encodeCmd := flag.NewFlagSet(encode, flag.ExitOnError)
+	encFile := encodeCmd.String("file", "", "png file to encode message")
+	encHead := encodeCmd.String("head", "", "message header")
+	encMsg := encodeCmd.String("msg", "", "message to encoding")
 
-	buf1 := []byte(str)
-	buf2 := bb.Bytes()
+	decodeCmd := flag.NewFlagSet(decode, flag.ExitOnError)
+	decFile := decodeCmd.String("file", "", "png file for decode message")
+	decHead := decodeCmd.String("head", "", "message header")
 
-	fmt.Printf("buf1 == buf2? - %t\n", bytes.Equal(buf1, buf2))
+	printCmd := flag.NewFlagSet(print, flag.ExitOnError)
+	printFile := printCmd.String("file", "", "png file to print")
 
-	c1 := crc32.ChecksumIEEE(buf1)
-	c2 := crc32.ChecksumIEEE(buf2)
+	rmCmd := flag.NewFlagSet(remove, flag.ExitOnError)
+	rmFile := rmCmd.String("file", "", "png file for remove message")
+	rmHead := rmCmd.String("head", "", "message header")
 
-	fmt.Printf("buf1 crc == %d\nbuf2 crc == %d\n", c1, c2)
+	switch os.Args[1] {
+	case encode:
+		encodeCmd.Parse(os.Args[2:])
+		err := api.EncodeMessage(*encFile, *encHead, *encMsg)
+		if err != nil {
+			fmt.Printf("Could not encode message: %v\n", err)
+			os.Exit(1)
+		}
+	case decode:
+		decodeCmd.Parse(os.Args[2:])
+		err := api.DecodeMessage(*decFile, *decHead)
+		if err != nil {
+			fmt.Printf("Could not decode message: %v\n", err)
+			os.Exit(1)
+		}
+	case print:
+		printCmd.Parse(os.Args[2:])
+		err := api.PrintPngFile(*printFile)
+		if err != nil {
+			fmt.Printf("Could not print file %v\n", err)
+			os.Exit(1)
+		}
+	case remove:
+		rmCmd.Parse(os.Args[2:])
+		err := api.RemoveMessage(*rmFile, *rmHead)
+		if err != nil {
+			fmt.Printf("Could not remove message %s: %v\n", *rmHead, err)
+			os.Exit(1)
+		}
+	default:
+		fmt.Printf("Unknown command %s\n", os.Args[1])
+		os.Exit(1)
+	}
+
 }
